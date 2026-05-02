@@ -420,8 +420,122 @@ User language: ${currentLang === 'hi' ? 'Hindi' : currentLang === 'bn' ? 'Bengal
 }
 
 // ============ PAYMENT (Razorpay) ============
+// ============ RAZORPAY PAYMENT INTEGRATION ============
+const RAZORPAY_KEY_ID = 'rzp_test_XXXXXXXXXXXXX'; // 🔑 Yahan apni Key ID paste kar
+
 function payNow(amount) {
-  alert(`💳 Payment Gateway: ₹${amount}\n\nRazorpay integration setup karne ke liye account bana lo (free): razorpay.com\n\nAbhi demo mode mein hai.`);
+  // Pehle user details lo
+  let userName = localStorage.getItem('userName');
+  let userPhone = localStorage.getItem('userPhone');
+  
+  if(!userName) {
+    userName = prompt('Apna naam batao:');
+    if(!userName) return;
+    localStorage.setItem('userName', userName);
+  }
+  
+  if(!userPhone) {
+    userPhone = prompt('Mobile number (10 digits):');
+    if(!userPhone || userPhone.length < 10) {
+      alert('Sahi mobile number daalo!');
+      return;
+    }
+    localStorage.setItem('userPhone', userPhone);
+  }
+  
+  // Plan name decide karo
+  let planName = '';
+  let planDesc = '';
+  if(amount === 10) {
+    planName = 'Intro Offer - 10 Min Consultation';
+    planDesc = '10 minutes AI Astrologer Chat';
+  } else if(amount === 49) {
+    planName = 'Daily Pass';
+    planDesc = '24 Hours Unlimited Chats';
+  } else if(amount === 299) {
+    planName = 'Monthly Premium';
+    planDesc = '30 Days Unlimited + Reports';
+  } else {
+    planName = 'DivineAI Service';
+    planDesc = 'Astrology Consultation';
+  }
+  
+  // Razorpay options
+  const options = {
+    key: RAZORPAY_KEY_ID,
+    amount: amount * 100, // Razorpay paise mein leta hai (₹10 = 1000 paise)
+    currency: 'INR',
+    name: 'DivineAI 🕉️',
+    description: planDesc,
+    image: 'https://img.icons8.com/fluency/96/om.png', // Logo
+    handler: function(response) {
+      // Payment successful!
+      const paymentId = response.razorpay_payment_id;
+      
+      // Save payment in localStorage
+      const payments = JSON.parse(localStorage.getItem('payments') || '[]');
+      payments.push({
+        id: paymentId,
+        amount: amount,
+        plan: planName,
+        date: new Date().toISOString(),
+        user: userName
+      });
+      localStorage.setItem('payments', JSON.stringify(payments));
+      
+      // Unlock benefits based on plan
+      if(amount === 10) {
+        // 10 min consultation - 10 messages unlock
+        localStorage.setItem('paidChats', '10');
+        localStorage.setItem('paidExpiry', Date.now() + 10*60*1000); // 10 min
+      } else if(amount === 49) {
+        localStorage.setItem('paidChats', '999');
+        localStorage.setItem('paidExpiry', Date.now() + 24*60*60*1000); // 24 hours
+      } else if(amount === 299) {
+        localStorage.setItem('paidChats', '999');
+        localStorage.setItem('paidExpiry', Date.now() + 30*24*60*60*1000); // 30 days
+      }
+      
+      // Success message
+      alert(`🎉 Payment Successful!\n\n✅ Payment ID: ${paymentId}\n💰 Amount: ₹${amount}\n📦 Plan: ${planName}\n\nAb chat unlock ho gayi! Enjoy 🙏`);
+      
+      // Open chat
+      openChat();
+    },
+    prefill: {
+      name: userName,
+      email: userName.toLowerCase().replace(/\s/g,'') + '@divineai.in',
+      contact: userPhone
+    },
+    notes: {
+      plan: planName,
+      app: 'DivineAI'
+    },
+    theme: {
+      color: '#FFD700'
+    },
+    modal: {
+      ondismiss: function() {
+        alert('Payment cancel kar diya. Koi baat nahi, dobara try karna! 🙏');
+      }
+    }
+  };
+  
+  // Razorpay open karo
+  const rzp = new Razorpay(options);
+  
+  rzp.on('payment.failed', function(response) {
+    alert('❌ Payment Failed!\nReason: ' + response.error.description + '\nDobara try karo.');
+  });
+  
+  rzp.open();
+}
+
+// Check if user has paid plan active
+function hasPaidPlan() {
+  const expiry = parseInt(localStorage.getItem('paidExpiry') || '0');
+  const chats = parseInt(localStorage.getItem('paidChats') || '0');
+  return expiry > Date.now() && chats > 0;
 }
 
 // ============ LOGIN ============
